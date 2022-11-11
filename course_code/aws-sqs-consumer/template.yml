@@ -1,0 +1,145 @@
+Parameters:
+    Image:
+      Type: String
+    Subnet:
+      Type: String
+    TopicName:
+      Type: String
+      Default: sample-topic
+    QueueName:
+      Type: String
+      Default: sample-queue
+    ClusterName:
+      Type: String
+      Default: sqs-consumer-cluster
+Resources:
+  Topic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+        - Endpoint: !GetAtt Queue.Arn
+          Protocol: "sqs" 
+      TopicName: !Ref TopicName
+  Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName : !Ref QueueName
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties: 
+      QueueName: !Join [ "-", [!Ref QueueName, "error"]]
+  TopicToQueuePermission:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref Queue
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt Queue.Arn
+  Cluster:
+    Type: AWS::ECS::Cluster
+    DependsOn: Queue
+    Properties:
+      ClusterName: !Ref ClusterName
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: 'consumer'
+      # awsvpc is required for Fargate
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: "256"
+      Memory: 0.5GB
+      ExecutionRoleArn: !Ref ExecutionRole
+      # "The Amazon Resource Name (ARN) of an AWS Identity and Access Management (IAM) role that grants containers in the task permission to call AWS APIs on your behalf."
+      TaskRoleArn: !Ref TaskRole
+      ContainerDefinitions:
+        - Name: 'consumer-container'
+          Image: !Ref Image
+          EntryPoint:
+            - ./sqs-consumer
+            - --wait-time
+            - "2"
+            - --region
+            - us-east-1
+            - --queue
+            - !GetAtt Queue.QueueName
+          LogConfiguration:
+                LogDriver: awslogs
+                Options:
+                  awslogs-region: !Ref AWS::Region
+                  awslogs-group: !Ref LogGroup
+                  awslogs-stream-prefix: ecs
+  # A role needed by ECS
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: 'consumer-execution-role'
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: 'ecr:*'
+                Resource: "*"
+  # A role for the containers
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: 'consumer-task-role'
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: "sqs:*"
+                Resource: '*'
+              - Effect: Allow
+                Action: "dynamodb:*"
+                Resource: '*'
+  Service:
+    Type: AWS::ECS::Service
+    Properties: 
+      ServiceName: "sqs-consumer-service"
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration: 
+        AwsvpcConfiguration:
+          # change to DISABLED if you're using private subnets that have access to a NAT gateway
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref Subnet
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: "ecs-sqs-consumer"

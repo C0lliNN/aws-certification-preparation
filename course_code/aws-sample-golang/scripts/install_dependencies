@@ -1,0 +1,6 @@
+#! /bin/bash
+
+yum install -y git golang
+git config --system credential.helper '!aws codecommit credential-helper $@'
+git config --system credential.UseHttpPath true
+git clone https://git-codecommit.us-east-1.amazonaws.com/v1/repos/sample-reactjs /app

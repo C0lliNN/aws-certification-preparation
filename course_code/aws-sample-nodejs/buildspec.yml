@@ -1,0 +1,19 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+        nodejs: latest
+    commands:
+        - npm ci --only=production
+
+artifacts:
+  files:
+    - node_modules/**/*
+    - static/**/*
+    - scripts/**/*
+    - index.js
+    - package.json
+    - package-lock.json
+    - appspec.yml
+

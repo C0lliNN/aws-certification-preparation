@@ -1,0 +1,5 @@
+#! /bin/bash
+
+export PORT=80
+cd /app
+go run cmd/main.go

@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  Bucket:
+    Type: String
+  S3Key: 
+    Type: String
+  S3ObjectVersion: 
+    Type: String
+Resources:
+  Function:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Sample Lambda Function
+      FunctionName: sample-lambda1
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt FunctionRole.Arn
+      Runtime: nodejs16.x
+      Timeout: 15
+      Code:
+        S3Bucket: !Ref Bucket
+        S3Key: !Ref S3Key
+        S3ObjectVersion: !Ref S3ObjectVersion
+
+  FunctionURL:
+    Type: AWS::Lambda::Url
+    Properties: 
+      AuthType: NONE
+      TargetFunctionArn: !GetAtt Function.Arn
+
+  FunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref Function
+      FunctionUrlAuthType: 'NONE'
+      Action: lambda:InvokeFunctionUrl
+      Principal: '*'
+
+  FunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: "Allow"
+          Principal:
+            Service:
+            - "lambda.amazonaws.com"
+          Action: "sts:AssumeRole"
+      ManagedPolicyArns: 
+      - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+      Path: "/"
+      Policies:
+        - 
+         PolicyName: "root"
+         PolicyDocument:
+           Version: "2012-10-17"
+           Statement:
+              - 
+                Effect: "Allow"
+                Action: 
+                  - "logs:*"
+                  - "s3:*"
+                Resource: "*"

@@ -1,0 +1,121 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  sam-app
+  
+  Sample SAM Template for sam-app
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 5
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,OPTIONS'"
+      AllowHeaders: "'content-type'"
+      AllowOrigin: "'*'"
+
+Resources:
+  UploadImageFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: upload-image-func/
+      Handler: main
+      Runtime: go1.x
+      Architectures:
+        - x86_64
+      Events:
+        CatchAll:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /images
+            Method: POST
+      Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
+        Variables:
+          TABLE_NAME: !Ref ImageTable
+          REGION_NAME: !Ref AWS::Region
+          BUCKET_NAME: !Ref ImageBucket
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref ImageTable
+        - S3WritePolicy:
+            BucketName: !Ref ImageBucket
+
+  GetImagesFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: get-images-func/
+      Handler: main
+      Runtime: go1.x
+      Architectures:
+        - x86_64
+      Events:
+        CatchAll:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /images
+            Method: GET
+      Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
+        Variables:
+          TABLE_NAME: !Ref ImageTable
+          REGION_NAME: !Ref AWS::Region
+          BUCKET_NAME: !Ref ImageBucket
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ImageTable
+        - S3ReadPolicy:
+            BucketName: !Ref ImageBucket
+
+  ImageTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: images
+      PrimaryKey:
+        Name: id
+        Type: String
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+
+  ImageBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      BucketName: collin-45342d-images-bucket
+
+  WebBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: collin-45342d-web-bucket
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+    DeletionPolicy: Delete
+
+  WebBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      PolicyDocument:
+        Id: MyPolicy
+        Version: 2012-10-17
+        Statement:
+          - Sid: PublicReadForGetBucketObjects
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Join 
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref WebBucket
+                - /*
+      Bucket: !Ref WebBucket  
+  
+
+Outputs:
+  WebsiteURL:
+    Value: !GetAtt WebBucket.WebsiteURL
+    Description: URL for website hosted on S3
+  ImageAPI:
+    Description: "API Gateway endpoint URL for Prod environment for image resource"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/images/"

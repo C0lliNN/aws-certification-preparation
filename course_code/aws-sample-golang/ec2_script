@@ -1,0 +1,18 @@
+#! /bin/bash
+
+yum install -y git golang
+git config --system credential.helper '!aws codecommit credential-helper $@'
+git config --system credential.UseHttpPath true
+git clone https://git-codecommit.us-east-1.amazonaws.com/v1/repos/sample-golang /app
+cd /app
+mkdir go
+mkdir cache
+
+export GO111MODULE=on
+export GOPATH=/app/go
+export GOCACHE=/app/cache
+
+go build -o app c0llinn/aws-sample-golang/cmd
+
+export PORT=80
+./app

@@ -1,0 +1,156 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Sample Golang Stack
+Parameters:
+ UserData: 
+  Type: String
+ KeyName: 
+  Type: String
+Resources:
+  Server:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-09d3b3274b6c5d4aa
+      InstanceType: t2.micro
+      UserData: !Ref UserData
+      KeyName: !Ref KeyName
+      IamInstanceProfile: !Ref ServerInstanceProfile
+      AvailabilityZone: us-east-1a
+      Monitoring: true
+      SecurityGroupIds:
+        - !Ref ServerSecurityGroup
+      Tags:
+        - Key: exam
+          Value: exam
+
+  ServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: sample-golang-group
+      GroupDescription: Allow HTTP, SSH and HTTPs access
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Exam
+          Value: Exam
+
+  ServerEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref Server
+
+  ServerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref ServerRole
+
+  ServerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: "golang-sample-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+
+  CodeCommitPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: "golang-sample-code-commit"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - codecommit:BatchGet*
+              - codecommit:BatchDescribe*
+              - codecommit:Describe*
+              - codecommit:EvaluatePullRequestApprovalRules
+              - codecommit:Get*
+              - codecommit:List*
+              - codecommit:GitPull
+            Resource: '*'
+          - Sid: CloudWatchEventsCodeCommitRulesReadOnlyAccess
+            Effect: Allow
+            Action:
+              - events:DescribeRule
+              - events:ListTargetsByRule
+            Resource: arn:aws:events:*:*:rule/codecommit*
+          - Sid: SNSSubscriptionAccess
+            Effect: Allow
+            Action:
+              - sns:ListTopics
+              - sns:ListSubscriptionsByTopic
+              - sns:GetTopicAttributes
+            Resource: '*'
+          - Sid: LambdaReadOnlyListAccess
+            Effect: Allow
+            Action:
+              - lambda:ListFunctions
+            Resource: '*'
+          - Sid: IAMReadOnlyListAccess
+            Effect: Allow
+            Action:
+              - iam:ListUsers
+            Resource: '*'
+          - Sid: IAMReadOnlyConsoleAccess
+            Effect: Allow
+            Action:
+              - iam:ListSSHPublicKeys
+              - iam:ListServiceSpecificCredentials
+              - iam:ListAccessKeys
+              - iam:GetSSHPublicKey
+            Resource: arn:aws:iam::*:user/${aws:username}
+          - Sid: CodeStarConnectionsReadOnlyAccess
+            Effect: Allow
+            Action:
+              - codestar-connections:ListConnections
+              - codestar-connections:GetConnection
+            Resource: arn:aws:codestar-connections:*:*:connection/*
+          - Sid: CodeStarNotificationsReadOnlyAccess
+            Effect: Allow
+            Action:
+              - codestar-notifications:DescribeNotificationRule
+            Resource: '*'
+            Condition:
+              StringLike:
+                codestar-notifications:NotificationsForResource: arn:aws:codecommit:*
+          - Sid: CodeStarNotificationsListAccess
+            Effect: Allow
+            Action:
+              - codestar-notifications:ListNotificationRules
+              - codestar-notifications:ListEventTypes
+              - codestar-notifications:ListTargets
+            Resource: '*'
+          - Sid: AmazonCodeGuruReviewerReadOnlyAccess
+            Effect: Allow
+            Action:
+              - codeguru-reviewer:DescribeRepositoryAssociation
+              - codeguru-reviewer:ListRepositoryAssociations
+              - codeguru-reviewer:DescribeCodeReview
+              - codeguru-reviewer:ListCodeReviews
+            Resource: '*'
+      Roles:
+       - !Ref ServerRole
+  
+Outputs:
+ PublicIP: 
+  Value: !GetAtt [Server, PublicIp]

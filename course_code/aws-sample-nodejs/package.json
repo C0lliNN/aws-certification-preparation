@@ -1,0 +1,25 @@
+{
+  "name": "aws-sample-nodejs",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A simple NodeJs app to deployed to AWS",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm test",
+    "dev": "nodemon index.js",
+    "start": "node index.js"
+  },
+  "author": "Raphael Collin",
+  "license": "ISC",
+  "dependencies": {
+    "@faker-js/faker": "^7.6.0",
+    "aws-sdk": "^2.1231.0",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20"
+  }
+}

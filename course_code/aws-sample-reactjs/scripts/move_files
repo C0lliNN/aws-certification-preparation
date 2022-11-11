@@ -1,0 +1,4 @@
+#!/bin/bash
+mv /var/www/html/build/* /var/www/html/
+rm -rf /var/www/html/build/
+
